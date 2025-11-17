@@ -42,7 +42,7 @@ enum Edxlappend
 //---------------------------------------------------------------------------
 class CDXLPhysicalAppend : public CDXLPhysical
 {
-private:
+protected:
 	// is the append node used in an update/delete statement
 	BOOL m_used_in_upd_del = false;
 

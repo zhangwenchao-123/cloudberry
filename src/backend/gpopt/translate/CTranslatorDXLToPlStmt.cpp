@@ -59,6 +59,7 @@ extern "C" {
 #include "naucrates/dxl/operators/CDXLNode.h"
 #include "naucrates/dxl/operators/CDXLPhysicalAgg.h"
 #include "naucrates/dxl/operators/CDXLPhysicalAppend.h"
+#include "naucrates/dxl/operators/CDXLPhysicalParallelAppend.h"
 #include "naucrates/dxl/operators/CDXLPhysicalAssert.h"
 #include "naucrates/dxl/operators/CDXLPhysicalBitmapTableScan.h"
 #include "naucrates/dxl/operators/CDXLPhysicalCTAS.h"
@@ -441,6 +442,11 @@ CTranslatorDXLToPlStmt::TranslateDXLOperatorToPlan(
 			plan = TranslateDXLAppend(dxlnode, output_context,
 									  ctxt_translation_prev_siblings);
 			break;
+		}
+		case EdxlopPhysicalParallelAppend:
+		{
+			plan = TranslateDXLParallelAppend(dxlnode, output_context,
+									 		  ctxt_translation_prev_siblings);
 		}
 		case EdxlopPhysicalMaterialize:
 		{
@@ -4506,6 +4512,41 @@ CTranslatorDXLToPlStmt::TranslateDXLAppend(
 
 	return (Plan *) append;
 }
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorDXLToPlStmt::TranslateDXLParallelAppend
+//
+//	@doc:
+//		Translates a DXL parallel append node into a parallel Append node
+Plan *
+CTranslatorDXLToPlStmt::TranslateDXLParallelAppend(
+	const CDXLNode *append_dxlnode, CDXLTranslateContext *output_context,
+	CDXLTranslationContextArray *ctxt_translation_prev_siblings)
+{
+	CDXLPhysicalParallelAppend *phy_parallel_append_dxlop =
+		CDXLPhysicalParallelAppend::Cast(append_dxlnode->GetOperator());
+
+	ULONG parallel_workers = phy_parallel_append_dxlop->UlParallelWorkers();
+
+	// create append plan node
+	Append *append = MakeNode(Append);
+
+	Plan *plan = &(append->plan);
+	plan->plan_node_id = m_dxl_to_plstmt_context->GetNextPlanId();
+
+	// translate operator costs
+	TranslatePlanCosts(append_dxlnode, plan);
+
+	const ULONG arity = append_dxlnode->Arity();
+	GPOS_ASSERT(EdxlappendIndexFirstChild < arity);
+	append->appendplans = NIL;
+
+	// Set parallel execution flags
+	plan->parallel_aware = true;
+	plan->parallel_safe = true;
+	plan->parallel = (int) parallel_workers;
+};
 
 //---------------------------------------------------------------------------
 //	@function:
