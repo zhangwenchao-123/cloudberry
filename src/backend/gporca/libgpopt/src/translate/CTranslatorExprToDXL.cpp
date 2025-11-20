@@ -1571,8 +1571,7 @@ CTranslatorExprToDXL::PdxlnAppendTableScan(
 		// CTranslatorDXLToPlstmt since these points do not apply there.
 		CDXLNode *pdxlnAppend = GPOS_NEW(m_mp) CDXLNode(
 			m_mp,
-			GPOS_NEW(m_mp) CDXLPhysicalAppend(m_mp, false, false, popDTS->ScanId(),
-											  root_dxl_table_descr, selector_ids));
+			GPOS_NEW(m_mp) CDXLPhysicalAppend(m_mp, false, false));
 		pdxlnAppend->SetProperties(pdxlpropDTS);
 		pdxlnAppend->AddChild(pdxlnPrLAppend);
 		pdxlnAppend->AddChild(PdxlnFilter(nullptr));
