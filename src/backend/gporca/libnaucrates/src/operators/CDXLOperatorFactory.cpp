@@ -31,6 +31,7 @@
 #include "naucrates/dxl/operators/CDXLPhysicalParallelTableScan.h"
 #include "naucrates/dxl/operators/CDXLPhysicalAgg.h"
 #include "naucrates/dxl/operators/CDXLPhysicalAppend.h"
+#include "naucrates/dxl/operators/CDXLPhysicalParallelAppend.h"
 #include "naucrates/dxl/operators/CDXLPhysicalBroadcastMotion.h"
 #include "naucrates/dxl/operators/CDXLPhysicalGatherMotion.h"
 #include "naucrates/dxl/operators/CDXLPhysicalHashJoin.h"
