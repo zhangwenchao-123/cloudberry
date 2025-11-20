@@ -2402,6 +2402,7 @@ CCostModelGPDB::CostScan(CMemoryPool *,	 // mp
 		case COperator::EopPhysicalForeignScan:
 		case COperator::EopPhysicalDynamicForeignScan:
 		case COperator::EopPhysicalParallelTableScan:
+		case COperator::EopPhysicalAppendTableScan:
 			// table scan cost considers only retrieving tuple cost,
 			// since we scan the entire table here, the cost is correlated with table rows and table width,
 			// since Scan's parent operator may be a filter that will be pushed into Scan node in GPDB plan,
@@ -2603,11 +2604,13 @@ CCostModelGPDB::Cost(
 		case COperator::EopPhysicalDynamicTableScan:
 		case COperator::EopPhysicalForeignScan:
 		case COperator::EopPhysicalDynamicForeignScan:
+		case COperator::EopPhysicalAppendTableScan:
 		{
 			return CostScan(m_mp, exprhdl, this, pci);
 		}
 
 		case COperator::EopPhysicalParallelTableScan:
+		case COperator::EopPhysicalParallelAppendTableScan:
 		{
 			return CostParallelTableScan(m_mp, exprhdl, this, pci);
 		}
