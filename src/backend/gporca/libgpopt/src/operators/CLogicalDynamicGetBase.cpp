@@ -236,6 +236,15 @@ CLogicalDynamicGetBase::ConstructRootColMappingPerPart(
 	CMDAccessor *mda = COptCtxt::PoctxtFromTLS()->Pmda();
 
 	ColRefToUlongMapArray *part_maps = GPOS_NEW(mp) ColRefToUlongMapArray(mp);
+
+	// Build hashmap of colname to the index
+	ColNameToIndexMap *root_mapping = GPOS_NEW(mp) ColNameToIndexMap(mp);
+	for (ULONG i = 0; i < root_cols->Size(); ++i)
+	{
+		CColRef *root_colref = (*root_cols)[i];
+		root_mapping->Insert(root_colref->Name().Pstr(), GPOS_NEW(mp) ULONG(i));
+	}
+
 	for (ULONG ul = 0; ul < partition_mdids->Size(); ++ul)
 	{
 		IMDId *part_mdid = (*partition_mdids)[ul];
@@ -244,35 +253,28 @@ CLogicalDynamicGetBase::ConstructRootColMappingPerPart(
 		GPOS_ASSERT(nullptr != partrel);
 
 		ColRefToUlongMap *mapping = GPOS_NEW(mp) ColRefToUlongMap(mp);
-
-		for (ULONG i = 0; i < root_cols->Size(); ++i)
+		// The root mapping cannot contain dropped columns, but may be
+		// in a different order than the child cols.Iterate through each of the child
+		// cols, and retrieve the corresponding index in the parent table
+		for (ULONG j = 0; j < partrel->ColumnCount(); ++j)
 		{
-			CColRef *root_colref = (*root_cols)[i];
+			const IMDColumn *coldesc = partrel->GetMdCol(j);
+			const CWStringConst *colname = coldesc->Mdname().GetMDName();
 
-			BOOL found_mapping = false;
-			for (ULONG j = 0, idx = 0; j < partrel->ColumnCount(); ++j, ++idx)
+			if (coldesc->IsDropped())
 			{
-				const IMDColumn *coldesc = partrel->GetMdCol(j);
-				const CWStringConst *colname = coldesc->Mdname().GetMDName();
-
-				if (coldesc->IsDropped())
-				{
-					--idx;
-					continue;
-				}
-
-				if (colname->Equals(root_colref->Name().Pstr()))
-				{
-					// Found the corresponding column in the child partition
-					// Save the index in the mapping
-					mapping->Insert(root_colref, GPOS_NEW(mp) ULONG(idx));
-					found_mapping = true;
-					break;
-				}
+				continue;
 			}
 
-			if (!found_mapping)
+			ULONG *root_idx = root_mapping->Find(colname);
+			if (nullptr != root_idx)
 			{
+				mapping->Insert((*root_cols)[*root_idx],
+								GPOS_NEW(mp) ULONG(*root_idx));
+			}
+			else
+			{
+				root_mapping->Release();
 				GPOS_RAISE(
 					CException::ExmaInvalid, CException::ExmiInvalid,
 					GPOS_WSZ_LIT(
@@ -281,5 +283,6 @@ CLogicalDynamicGetBase::ConstructRootColMappingPerPart(
 		}
 		part_maps->Append(mapping);
 	}
+	root_mapping->Release();
 	return part_maps;
 }

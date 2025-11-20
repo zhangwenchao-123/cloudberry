@@ -427,7 +427,6 @@ bool		optimizer_enable_range_predicate_dpe;
 bool		optimizer_enable_use_distribution_in_dqa;
 bool		optimizer_enable_push_join_below_union_all;
 bool		optimizer_enable_orderedagg;
-bool		optimizer_disable_dynamic_table_scan;
 
 /* Analyze related GUCs for Optimizer */
 bool		optimizer_analyze_root_partition;
@@ -3101,14 +3100,14 @@ struct config_bool ConfigureNamesBool_gp[] =
 	},
 
 	{
-		{"optimizer_disable_dynamic_table_scan", PGC_USERSET, DEVELOPER_OPTIONS,
-		 gettext_noop("Disable the dynamic seq/bitmap/index scan in partition table."),
+		{"gp_pause_on_restore_point_replay", PGC_SIGHUP, DEVELOPER_OPTIONS,
+		 gettext_noop("Pause recovery when a restore point is replayed."),
 		 NULL,
-		 GUC_NOT_IN_SAMPLE
-		 },
-		 &optimizer_disable_dynamic_table_scan,
-		 false,
-		 NULL, NULL, NULL
+		 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_pause_on_restore_point_replay,
+		false,
+		NULL, NULL, NULL
 	},
 
 	{

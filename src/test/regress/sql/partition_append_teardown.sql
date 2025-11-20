@@ -1,3 +1,0 @@
-DROP DATABASE IF EXISTS partition_append;
-reset optimizer_disable_dynamic_table_scan;
-reset optimizer;
