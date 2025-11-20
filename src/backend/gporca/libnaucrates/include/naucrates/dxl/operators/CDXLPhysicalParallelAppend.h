@@ -44,11 +44,26 @@ using namespace gpos;
 //		Class for representing DXL parallel append operators
 //
 //---------------------------------------------------------------------------
-class CDXLPhysicalParallelAppend : public CDXLPhysicalAppend
+class CDXLPhysicalParallelAppend : public CDXLPhysical
 {
 private:
 	// number of parallel workers
 	ULONG m_ulParallelWorkers;
+
+	// is the append node used in an update/delete statement
+	BOOL m_used_in_upd_del = false;
+
+	// TODO:  - Apr 12, 2011; find a better name (and comments) for this variable
+	BOOL m_is_zapped = false;
+
+	// scan id from the CPhysicalDynamicTableScan (a.k.a part_index_id)
+	// when m_scan_id != gpos::ulong_max
+	ULONG m_scan_id = gpos::ulong_max;
+
+	// table descr of the root partitioned table (when translated from a CPhysicalDynamicTableScan)
+	CDXLTableDescr *m_dxl_table_descr = nullptr;
+
+	ULongPtrArray *m_selector_ids = nullptr;
 
 public:
 	CDXLPhysicalParallelAppend(const CDXLPhysicalParallelAppend &) = delete;
@@ -62,16 +77,38 @@ public:
 							   ULongPtrArray *selector_ids, ULONG ulParallelWorkers);
 
 	// dtor
-	~CDXLPhysicalParallelAppend() override = default;
+	~CDXLPhysicalParallelAppend() override;
 
-	// get operator type
+	// accessors
 	Edxlopid GetDXLOperator() const override;
-
-	// get operator name
 	const CWStringConst *GetOpNameStr() const override;
 
 	BOOL IsUsedInUpdDel() const;
 	BOOL IsZapped() const;
+
+	CDXLTableDescr *
+	GetDXLTableDesc() const
+	{
+		return m_dxl_table_descr;
+	}
+
+	void
+	SetDXLTableDesc(CDXLTableDescr *dxl_table_desc)
+	{
+		m_dxl_table_descr = dxl_table_desc;
+	}
+
+	ULONG
+	GetScanId() const
+	{
+		return m_scan_id;
+	}
+
+	const ULongPtrArray *
+	GetSelectorIds() const
+	{
+		return m_selector_ids;
+	}
 
 	// get number of parallel workers
 	ULONG UlParallelWorkers() const
@@ -81,7 +118,7 @@ public:
 
 	// serialize operator in DXL format
 	void SerializeToDXL(CXMLSerializer *xml_serializer,
-					 	const CDXLNode *dxlnode) const override;
+						const CDXLNode *dxlnode) const override;
 
 	// conversion function
 	static CDXLPhysicalParallelAppend *
@@ -96,11 +133,11 @@ public:
 #ifdef GPOS_DEBUG
 	// checks whether the operator has valid structure, i.e. number and
 	// types of child nodes
-	void AssertValid(const CDXLNode *dxlnode, BOOL validate_children) const override;
+	void AssertValid(const CDXLNode *, BOOL validate_children) const override;
 #endif	// GPOS_DEBUG
-
 };	// class CDXLPhysicalParallelAppend
 
 }	// namespace gpdxl
 #endif	// !GPDXL_CDXLPhysicalParallelAppend_H
 
+//	EOF
