@@ -85,6 +85,8 @@ OBJS        = CExpression.o \
               CPhysicalBitmapTableScan.o \
               CPhysicalCTEConsumer.o \
               CPhysicalCTEProducer.o \
+              CPhysicalParallelCTEConsumer.o \
+              CPhysicalParallelCTEProducer.o \
               CPhysicalComputeScalar.o \
               CPhysicalConstTableGet.o \
               CPhysicalDML.o \
@@ -135,6 +137,7 @@ OBJS        = CExpression.o \
               CPhysicalScalarAgg.o \
               CPhysicalScan.o \
               CPhysicalSequence.o \
+              CPhysicalParallelSequence.o \
               CPhysicalSequenceProject.o \
               CPhysicalHashSequenceProject.o \
               CPhysicalSerialUnionAll.o \

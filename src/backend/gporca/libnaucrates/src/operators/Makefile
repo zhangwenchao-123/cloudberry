@@ -57,7 +57,9 @@ OBJS        = CDXLColDescr.o \
               CDXLPhysicalBroadcastWorkersMotion.o \
               CDXLPhysicalCTAS.o \
               CDXLPhysicalCTEConsumer.o \
+              CDXLPhysicalParallelCTEConsumer.o \
               CDXLPhysicalCTEProducer.o \
+              CDXLPhysicalParallelCTEProducer.o \
               CDXLPhysicalDML.o \
               CDXLPhysicalDynamicBitmapTableScan.o \
               CDXLPhysicalDynamicIndexScan.o \
@@ -84,6 +86,7 @@ OBJS        = CDXLColDescr.o \
               CDXLPhysicalResult.o \
               CDXLPhysicalRoutedDistributeMotion.o \
               CDXLPhysicalSequence.o \
+              CDXLPhysicalParallelSequence.o \
               CDXLPhysicalSort.o \
               CDXLPhysicalSplit.o \
               CDXLPhysicalTVF.o \
