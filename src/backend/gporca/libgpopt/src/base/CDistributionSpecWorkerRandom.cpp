@@ -54,10 +54,8 @@ CDistributionSpecWorkerRandom::CDistributionSpecWorkerRandom(ULONG ulWorkers, CD
 	: m_ulWorkers(ulWorkers), m_pdsSegmentBase(pdsSegmentBase)
 {
 	GPOS_ASSERT(ulWorkers > 0);
-	GPOS_ASSERT(nullptr != pdsSegmentBase &&
-				"pdsSegmentBase must be non-null. Use PdsCreateWorkerRandom factory method.");
-
-	m_pdsSegmentBase->AddRef();
+	if (m_pdsSegmentBase)
+		m_pdsSegmentBase->AddRef();
 
 	if (COptCtxt::PoctxtFromTLS()->FDMLQuery())
 	{
@@ -278,7 +276,7 @@ CDistributionSpecWorkerRandom::AppendEnforcers(CMemoryPool *mp,
 			CDistributionSpecWorkerRandom *random_dist_spec = nullptr;
 
 			// Check base distribution type to select appropriate motion operator
-			if (CDistributionSpec::EdtHashed == m_pdsSegmentBase->Edt())
+			if (!m_pdsSegmentBase || CDistributionSpec::EdtHashed == m_pdsSegmentBase->Edt())
 			{
 				if (GPOS_FTRACE(EopttraceDisableMotionHashDistributeWorkers))
 				{
