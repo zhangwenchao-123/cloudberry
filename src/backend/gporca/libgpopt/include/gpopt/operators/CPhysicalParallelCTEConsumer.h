@@ -212,7 +212,7 @@ public:
 	PopConvert(COperator *pop)
 	{
 		GPOS_ASSERT(nullptr != pop);
-		GPOS_ASSERT(CPhysicalParallelCTEConsumer == pop->Eopid());
+		GPOS_ASSERT(EopPhysicalParallelCTEConsumer == pop->Eopid());
 
 		return dynamic_cast<CPhysicalParallelCTEConsumer *>(pop);
 	}
