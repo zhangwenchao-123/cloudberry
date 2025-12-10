@@ -95,10 +95,10 @@ CXformInnerJoin2ParallelHashJoin::Exfp(CExpressionHandle &exprhdl) const
 
 	// Check if the query has any parallel operators
 	// Parallel hash join is only beneficial when parallel table scans exist
-	if (!COptCtxt::PoctxtFromTLS()->HasParallelOperators())
-	{
-		return CXform::ExfpNone;
-	}
+//	if (!COptCtxt::PoctxtFromTLS()->HasParallelOperators())
+//	{
+//		return CXform::ExfpNone;
+//	}
 
 	// Use the same logic as regular hash join transformation
 	return CXformUtils::ExfpLogicalJoin2PhysicalJoin(exprhdl);

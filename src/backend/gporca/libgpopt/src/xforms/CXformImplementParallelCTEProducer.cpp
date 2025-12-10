@@ -108,6 +108,8 @@ CXformImplementParallelCTEProducer::Transform(CXformContext *pxfctxt,
 	CExpression *pexprChild = (*pexpr)[0];
 	pexprChild->AddRef();
 
+	COptCtxt::PoctxtFromTLS()->SetHasParallelOperators();
+
 	// create physical CTE Producer
 	CExpression *pexprAlt = GPOS_NEW(mp)
 		CExpression(mp, GPOS_NEW(mp) CPhysicalParallelCTEProducer(mp, id, colref_array, popCTEProducer->UsedMask(), 2),

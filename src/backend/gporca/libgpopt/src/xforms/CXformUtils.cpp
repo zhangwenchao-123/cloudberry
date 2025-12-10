@@ -134,12 +134,12 @@ CXformUtils::FHasParallelIncompatibleOps(CMemo *pmemo)
 			COperator::EOperatorId eopid = pgexpr->Pop()->Eopid();
 
 			// Check for CTE-related operators (incompatible with parallel execution)
-			if (COperator::EopLogicalCTEProducer == eopid ||
-				COperator::EopLogicalSequence == eopid ||
-				COperator::EopLogicalSequenceProject == eopid)
-			{
-				return true;
-			}
+//			if (COperator::EopLogicalCTEProducer == eopid ||
+//				COperator::EopLogicalSequence == eopid ||
+//				COperator::EopLogicalSequenceProject == eopid)
+//			{
+//				return true;
+//			}
 
 			// Check for set operations (incompatible with parallel execution)
 			if (COperator::EopLogicalUnion == eopid ||

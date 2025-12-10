@@ -197,21 +197,113 @@ CPhysicalParallelSequence::FProvidesReqdCols(CExpressionHandle &exprhdl,
 //---------------------------------------------------------------------------
 CDistributionSpec *
 CPhysicalParallelSequence::PdsRequired(CMemoryPool *mp,
-							   CExpressionHandle &
+									   CExpressionHandle &
 #ifdef GPOS_DEBUG
 	exprhdl
 #endif	// GPOS_DEBUG
 	,
-							   CDistributionSpec *,
-							   ULONG child_index, CDrvdPropArray *,
-							   ULONG ulOptReq) const
+									   CDistributionSpec *pdsRequired,
+									   ULONG child_index, CDrvdPropArray *pdrgpdpCtxt,
+									   ULONG ulOptReq) const
 {
 	GPOS_ASSERT(2 == exprhdl.Arity());
 	GPOS_ASSERT(child_index < exprhdl.Arity());
 	GPOS_ASSERT(ulOptReq < UlDistrRequests());
-	// always WorkerRandom distribution spec
-	// TODO compute m_ulParallelWorkers from children nodes
-	return GPOS_NEW(mp) CDistributionSpecWorkerRandom(m_ulParallelWorkers, nullptr);
+
+	// The following distribution requests ensure matching number of
+	// producers and consumers. Any mismatch, either more producers
+	// than consumers, or more consumers than producers, will cause
+	// the query to hang
+
+	// 1st request
+	if (0 == ulOptReq)
+	{
+		// If the incoming request is a singleton, request singleton
+		// on ALL the children. No need to check strict singleton,
+		// cause strict singleton is a derived only spec.
+		if (CDistributionSpec::EdtSingleton == pdsRequired->Edt())
+		{
+			CDistributionSpecSingleton *pdss =
+				CDistributionSpecSingleton::PdssConvert(pdsRequired);
+			return GPOS_NEW(mp) CDistributionSpecSingleton(pdss->Est());
+		}
+
+		// Otherwise, request non-singleton (excluding replicated)
+		// on ALL the children.
+
+		// If the input is hashed or randomly distributed, no motion
+		// will be enforced. Both the producer and the consumer are
+		// executed on all the segments. That is, no mismatch between
+		// the number of producers and consumers.
+
+		// If the input is replicated, a hash filter will be applied
+		// to the input. The hash filter resolves the duplicate hazard,
+		// and now the producer is randomly distributed. The consumer
+		// will continue to be executed on all the segments. Again, no
+		// mismatch between the number of producers and consumers.
+		return GPOS_NEW(mp)
+			CDistributionSpecNonSingleton(false /* fAllowReplicated */);
+	}
+
+	// 2nd request
+	GPOS_ASSERT(1 == ulOptReq);
+
+	if (0 == child_index)
+	{
+		// Request Any on the first child
+		return GPOS_NEW(mp) CDistributionSpecAny(this->Eopid());
+	}
+
+	// Get derived plan properties of first child
+	CDrvdPropPlan *pdpplan = CDrvdPropPlan::Pdpplan((*pdrgpdpCtxt)[0]);
+	// Because we request Any on the first child, no motion could
+	// have been enforced. The derived spec of the first child is
+	// what it delivers in the first place.
+	CDistributionSpec *pds = pdpplan->Pds();
+
+	// If the first child is singleton, request singleton on the
+	// second child. This request is identical to the 1st request
+	// (ulOptReq = 0), where we request singleton on ALL the
+	// children, and would eventually be deduplicated.
+	if (pds->FSingletonOrStrictSingleton())
+	{
+		CDistributionSpecSingleton *pdss =
+			CDistributionSpecSingleton::PdssConvert(pds);
+		return GPOS_NEW(mp) CDistributionSpecSingleton(pdss->Est());
+	}
+
+	// If the first child is universal, request Any on the second
+	// child. This is because if the producer is universally
+	// available, no matter what the locality of the consumer
+	// is, the consumer would be able to access the shared data
+	if (CDistributionSpec::EdtUniversal == pds->Edt())
+	{
+		return GPOS_NEW(mp) CDistributionSpecAny(this->Eopid());
+	}
+
+	// If the first child is replicated, request replicated on the
+	// second child. This way, the producer is only executed on one
+	// segment, and so is the consumer. The plan would look like:
+	// Gather Motion 1:1  (slice1; segments: 1)
+	//   ->  Sequence
+	//         ->  Shared Scan (share slice:id 1:1)
+	//               ->  Seq Scan on rep
+	//         ->  Broadcast Motion 3:1  (slice2; segments: 3)
+	//             ...
+	//             ...
+	//             ->  Gather Motion 1:1  (sliceN; segments: 1)
+	//                   ->  Shared Scan (share slice:id N:1)
+	if (CDistributionSpec::EdtStrictReplicated == pds->Edt() ||
+		CDistributionSpec::EdtTaintedReplicated == pds->Edt())
+	{
+		return GPOS_NEW(mp)
+			CDistributionSpecReplicated(CDistributionSpec::EdtReplicated);
+	}
+
+	// Request non-singleton (excluding replicated) on the second
+	// child
+	return GPOS_NEW(mp)
+		CDistributionSpecNonSingleton(false /* fAllowReplicated */);
 }
 
 //---------------------------------------------------------------------------
