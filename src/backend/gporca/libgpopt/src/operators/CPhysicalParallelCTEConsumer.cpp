@@ -271,7 +271,7 @@ CPhysicalParallelCTEConsumer::PcmDerive(CMemoryPool *mp, CExpressionHandle &
 	GPOS_ASSERT(0 == exprhdl.Arity());
 
 	CCTEMap *pcmConsumer = GPOS_NEW(mp) CCTEMap(mp);
-	pcmConsumer->Insert(m_id, CCTEMap::EctConsumer, nullptr /*pdpplan*/);
+	pcmConsumer->Insert(m_id, true, CCTEMap::EctConsumer, nullptr /*pdpplan*/);
 
 	return pcmConsumer;
 }

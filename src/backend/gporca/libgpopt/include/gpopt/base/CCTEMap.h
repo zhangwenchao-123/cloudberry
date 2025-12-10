@@ -16,6 +16,8 @@
 #ifndef GPOPT_CCTEMap_H
 #define GPOPT_CCTEMap_H
 
+#include <utility>
+
 #include "gpos/base.h"
 #include "gpos/common/CHashMap.h"
 #include "gpos/common/CHashMapIter.h"
@@ -78,6 +80,9 @@ private:
 		// cte id
 		ULONG m_id;
 
+		// parallel flag
+		BOOL m_fParallel;
+
 		// cte type
 		CCTEMap::ECteType m_ect;
 
@@ -88,8 +93,9 @@ private:
 		CCTEMapEntry(const CCTEMapEntry &) = delete;
 
 		// ctor
-		CCTEMapEntry(ULONG id, CCTEMap::ECteType ect, CDrvdPropPlan *pdpplan)
-			: m_id(id), m_ect(ect), m_pdpplan(pdpplan)
+		CCTEMapEntry(ULONG id, BOOL fParallel, CCTEMap::ECteType ect,
+					 CDrvdPropPlan *pdpplan)
+			: m_id(id), m_fParallel(fParallel), m_ect(ect), m_pdpplan(pdpplan)
 		{
 			GPOS_ASSERT(EctSentinel > ect);
 			GPOS_ASSERT_IMP(EctProducer == ect, nullptr != pdpplan);
@@ -106,6 +112,13 @@ private:
 		Id() const
 		{
 			return m_id;
+		}
+
+		// parallel flag
+		BOOL
+		FParallel() const
+		{
+			return m_fParallel;
 		}
 
 		// cte type
@@ -128,14 +141,15 @@ private:
 		{
 			return gpos::CombineHashes(
 				gpos::HashValue<ULONG>(&m_id),
-				gpos::HashValue<CCTEMap::ECteType>(&m_ect));
+				gpos::HashValue<BOOL>(&m_fParallel));
 		}
 
 		// print function
 		IOstream &
 		OsPrint(IOstream &os) const
 		{
-			os << m_id << (EctProducer == m_ect ? "p" : "c");
+			os << m_id << (m_fParallel ? "(parallel)" : "")
+			   << (EctProducer == m_ect ? "p" : "c");
 			if (nullptr != m_pdpplan)
 			{
 				os << "(" << *m_pdpplan << ")";
@@ -146,16 +160,17 @@ private:
 
 	};	// class CCTEMapEntry
 
-	// map CTE id to CTE map entry
+	// map CTE id and parallel flag pair to CTE map entry
 	using UlongToCTEMapEntryMap =
-		CHashMap<ULONG, CCTEMapEntry, gpos::HashValue<ULONG>,
-				 gpos::Equals<ULONG>, CleanupDelete<ULONG>,
+		CHashMap<UlongBoolPair, CCTEMapEntry, gpos::HashValue<UlongBoolPair>,
+				 gpos::Equals<UlongBoolPair>, CleanupDelete<UlongBoolPair>,
 				 CleanupRelease<CCTEMapEntry>>;
 
 	// map iterator
 	using UlongToCTEMapEntryMapIter =
-		CHashMapIter<ULONG, CCTEMapEntry, gpos::HashValue<ULONG>,
-					 gpos::Equals<ULONG>, CleanupDelete<ULONG>,
+		CHashMapIter<UlongBoolPair, CCTEMapEntry,
+					 gpos::HashValue<UlongBoolPair>,
+					 gpos::Equals<UlongBoolPair>, CleanupDelete<UlongBoolPair>,
 					 CleanupRelease<CCTEMapEntry>>;
 
 	// memory pool
@@ -164,8 +179,8 @@ private:
 	// cte map
 	UlongToCTEMapEntryMap *m_phmcm;
 
-	// lookup info for given cte id
-	CCTEMapEntry *PcmeLookup(ULONG ulCteId) const;
+	// lookup info for given cte id and parallel flag
+	CCTEMapEntry *PcmeLookup(ULONG ulCteId, BOOL fParallel) const;
 
 	// helper to add entries found in first map and are unresolved based on second map
 	static void AddUnresolved(const CCTEMap &cmFirst, const CCTEMap &cmSecond,
@@ -183,8 +198,9 @@ public:
 	// return the CTE type associated with the given ID in the map
 	ECteType Ect(const ULONG id) const;
 
-	// inserting a new map entry, no entry with the same id can already exist
-	void Insert(ULONG ulCteId, ECteType ect, CDrvdPropPlan *pdpplan);
+	// inserting a new map entry, no entry with the same id and parallel flag can already exist
+	void Insert(ULONG ulCteId, BOOL fParallel, ECteType ect,
+				CDrvdPropPlan *pdpplan);
 
 	// hash function
 	ULONG HashValue() const;

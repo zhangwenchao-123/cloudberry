@@ -28,9 +28,14 @@ FORCE_GENERATE_DBGSTR(CCTEReq::CCTEReqEntry);
 //		Ctor
 //
 //---------------------------------------------------------------------------
-CCTEReq::CCTEReqEntry::CCTEReqEntry(ULONG id, CCTEMap::ECteType ect,
-									BOOL fRequired, CDrvdPropPlan *pdpplan)
-	: m_id(id), m_ect(ect), m_fRequired(fRequired), m_pdpplan(pdpplan)
+CCTEReq::CCTEReqEntry::CCTEReqEntry(ULONG id, BOOL fParallel,
+									CCTEMap::ECteType ect, BOOL fRequired,
+									CDrvdPropPlan *pdpplan)
+	: m_id(id),
+	  m_fParallel(fParallel),
+	  m_ect(ect),
+	  m_fRequired(fRequired),
+	  m_pdpplan(pdpplan)
 {
 	GPOS_ASSERT(CCTEMap::EctSentinel > ect);
 	GPOS_ASSERT_IMP(nullptr == pdpplan, CCTEMap::EctProducer == ect);
@@ -62,7 +67,9 @@ CCTEReq::CCTEReqEntry::HashValue() const
 {
 	ULONG ulHash =
 		gpos::CombineHashes(gpos::HashValue<ULONG>(&m_id),
-							gpos::HashValue<CCTEMap::ECteType>(&m_ect));
+							gpos::HashValue<BOOL>(&m_fParallel));
+	ulHash = gpos::CombineHashes(ulHash,
+								 gpos::HashValue<CCTEMap::ECteType>(&m_ect));
 	ulHash = gpos::CombineHashes(ulHash, gpos::HashValue<BOOL>(&m_fRequired));
 
 	if (nullptr != m_pdpplan)
@@ -85,8 +92,8 @@ BOOL
 CCTEReq::CCTEReqEntry::Equals(CCTEReqEntry *pcre) const
 {
 	GPOS_ASSERT(nullptr != pcre);
-	if (m_id != pcre->Id() || m_ect != pcre->Ect() ||
-		m_fRequired != pcre->FRequired())
+	if (m_id != pcre->Id() || m_fParallel != pcre->FParallel() ||
+		m_ect != pcre->Ect() || m_fRequired != pcre->FRequired())
 	{
 		return false;
 	}
@@ -116,7 +123,8 @@ CCTEReq::CCTEReqEntry::Equals(CCTEReqEntry *pcre) const
 IOstream &
 CCTEReq::CCTEReqEntry::OsPrint(IOstream &os) const
 {
-	os << m_id << (CCTEMap::EctProducer == m_ect ? ":p" : ":c")
+	os << m_id << (m_fParallel ? "(parallel)" : "")
+	   << (CCTEMap::EctProducer == m_ect ? ":p" : ":c")
 	   << (m_fRequired ? " " : "(opt) ");
 
 	if (nullptr != m_pdpplan)
@@ -140,7 +148,7 @@ CCTEReq::CCTEReq(CMemoryPool *mp)
 	GPOS_ASSERT(nullptr != mp);
 
 	m_phmcter = GPOS_NEW(m_mp) UlongToCTEReqEntryMap(m_mp);
-	m_pdrgpulRequired = GPOS_NEW(m_mp) ULongPtrArray(m_mp);
+	m_pdrgpulRequired = GPOS_NEW(m_mp) UlongBoolPairArray(m_mp);
 }
 
 //---------------------------------------------------------------------------
@@ -162,22 +170,25 @@ CCTEReq::~CCTEReq()
 //		CCTEReq::Insert
 //
 //	@doc:
-//		Insert a new map entry. No entry with the same id can already exist
+//		Insert a new map entry. No entry with the same id and parallel flag can already exist
 //
 //---------------------------------------------------------------------------
 void
-CCTEReq::Insert(ULONG ulCteId, CCTEMap::ECteType ect, BOOL fRequired,
-				CDrvdPropPlan *pdpplan)
+CCTEReq::Insert(ULONG ulCteId, BOOL fParallel, CCTEMap::ECteType ect,
+				BOOL fRequired, CDrvdPropPlan *pdpplan)
 {
 	GPOS_ASSERT(CCTEMap::EctSentinel > ect);
 	CCTEReqEntry *pcre =
-		GPOS_NEW(m_mp) CCTEReqEntry(ulCteId, ect, fRequired, pdpplan);
-	BOOL fSuccess GPOS_ASSERTS_ONLY =
-		m_phmcter->Insert(GPOS_NEW(m_mp) ULONG(ulCteId), pcre);
+		GPOS_NEW(m_mp) CCTEReqEntry(ulCteId, fParallel, ect, fRequired, pdpplan);
+	
+	// Create pair key using std::pair
+	UlongBoolPair *pPair = GPOS_NEW(m_mp) UlongBoolPair(ulCteId, fParallel);
+	
+	BOOL fSuccess GPOS_ASSERTS_ONLY = m_phmcter->Insert(pPair, pcre);
 	GPOS_ASSERT(fSuccess);
 	if (fRequired)
 	{
-		m_pdrgpulRequired->Append(GPOS_NEW(m_mp) ULONG(ulCteId));
+		m_pdrgpulRequired->Append(GPOS_NEW(m_mp) UlongBoolPair(ulCteId, fParallel));
 	}
 }
 
@@ -202,7 +213,9 @@ CCTEReq::InsertConsumer(ULONG id, CDrvdPropArray *pdrgpdpCtxt)
 				"unexpected CTE producer plan properties");
 
 	pdpplan->AddRef();
-	Insert(id, CCTEMap::EctConsumer, true /*fRequired*/, pdpplan);
+	//todo fix fParallel
+	Insert(id, false /*fParallel*/, CCTEMap::EctConsumer, true /*fRequired*/,
+		   pdpplan);
 }
 
 //---------------------------------------------------------------------------
@@ -210,13 +223,14 @@ CCTEReq::InsertConsumer(ULONG id, CDrvdPropArray *pdrgpdpCtxt)
 //		CCTEReq::PcreLookup
 //
 //	@doc:
-//		Lookup info for given cte id
+//		Lookup info for given cte id and parallel flag
 //
 //---------------------------------------------------------------------------
 CCTEReq::CCTEReqEntry *
-CCTEReq::PcreLookup(ULONG ulCteId) const
+CCTEReq::PcreLookup(ULONG ulCteId, BOOL fParallel) const
 {
-	return m_phmcter->Find(&ulCteId);
+	UlongBoolPair pair(ulCteId, fParallel);
+	return m_phmcter->Find(&pair);
 }
 
 //---------------------------------------------------------------------------
@@ -249,7 +263,7 @@ CCTEReq::FSubset(const CCTEReq *pcter) const
 	while (hmcri.Advance())
 	{
 		const CCTEReqEntry *pcre = hmcri.Value();
-		CCTEReqEntry *pcreOther = pcter->PcreLookup(pcre->Id());
+		CCTEReqEntry *pcreOther = pcter->PcreLookup(pcre->Id(), pcre->FParallel());
 		if (nullptr == pcreOther || !pcre->Equals(pcreOther))
 		{
 			return false;
@@ -270,7 +284,14 @@ CCTEReq::FSubset(const CCTEReq *pcter) const
 BOOL
 CCTEReq::FContainsRequirement(const ULONG id, const CCTEMap::ECteType ect) const
 {
-	CCTEReqEntry *pcre = PcreLookup(id);
+	// Try both parallel values since we only have CTE ID
+	CCTEReqEntry *pcre = PcreLookup(id, false);
+	if (nullptr != pcre && pcre->Ect() == ect)
+	{
+		return true;
+	}
+	
+	pcre = PcreLookup(id, true);
 	return (nullptr != pcre && pcre->Ect() == ect);
 }
 
@@ -285,7 +306,12 @@ CCTEReq::FContainsRequirement(const ULONG id, const CCTEMap::ECteType ect) const
 CCTEMap::ECteType
 CCTEReq::Ect(const ULONG id) const
 {
-	CCTEReqEntry *pcre = PcreLookup(id);
+	// Try both parallel values since we only have CTE ID
+	CCTEReqEntry *pcre = PcreLookup(id, false);
+	if (nullptr == pcre)
+	{
+		pcre = PcreLookup(id, true);
+	}
 	GPOS_ASSERT(nullptr != pcre);
 	return pcre->Ect();
 }
@@ -339,6 +365,7 @@ CCTEReq::PcterUnresolved(CMemoryPool *mp, CCTEMap *pcm)
 		// then keep it as required, else make it optional
 		const CCTEReqEntry *pcre = hmcri.Value();
 		ULONG id = pcre->Id();
+		BOOL fParallel = pcre->FParallel();
 		BOOL fRequired =
 			pcre->FRequired() && CCTEMap::EctSentinel == pcm->Ect(id);
 		CDrvdPropPlan *pdpplan = pcre->PdpplanProducer();
@@ -347,7 +374,7 @@ CCTEReq::PcterUnresolved(CMemoryPool *mp, CCTEMap *pcm)
 			pdpplan->AddRef();
 		}
 
-		pcterUnresolved->Insert(id, pcre->Ect(), fRequired, pdpplan);
+		pcterUnresolved->Insert(id, fParallel, pcre->Ect(), fRequired, pdpplan);
 	}
 
 	return pcterUnresolved;
@@ -378,6 +405,7 @@ CCTEReq::PcterUnresolvedSequence(
 		const CCTEReqEntry *pcre = hmcri.Value();
 
 		ULONG id = pcre->Id();
+		BOOL fParallel = pcre->FParallel();
 		CCTEMap::ECteType ect = pcre->Ect();
 		BOOL fRequired = pcre->FRequired();
 
@@ -390,7 +418,7 @@ CCTEReq::PcterUnresolvedSequence(
 			CDrvdPropPlan *pdpplan = pcre->PdpplanProducer();
 			GPOS_ASSERT(nullptr != pdpplan);
 			pdpplan->AddRef();
-			pcterUnresolved->Insert(id, ect, false /*fReqiored*/, pdpplan);
+			pcterUnresolved->Insert(id, fParallel, ect, false /*fReqiored*/, pdpplan);
 		}
 		else if (!fRequired && CCTEMap::EctProducer == ect &&
 				 CCTEMap::EctSentinel != ectDrvd)
@@ -411,7 +439,7 @@ CCTEReq::PcterUnresolvedSequence(
 			{
 				pdpplan->AddRef();
 			}
-			pcterUnresolved->Insert(id, ect, fRequired, pdpplan);
+			pcterUnresolved->Insert(id, fParallel, ect, fRequired, pdpplan);
 		}
 	}
 
@@ -451,7 +479,8 @@ CCTEReq::PcterAllOptional(CMemoryPool *mp)
 		{
 			pdpplan->AddRef();
 		}
-		pcter->Insert(pcre->Id(), pcre->Ect(), false /*fRequired*/, pdpplan);
+		pcter->Insert(pcre->Id(), pcre->FParallel(), pcre->Ect(),
+					  false /*fRequired*/, pdpplan);
 	}
 
 	return pcter;
@@ -463,13 +492,13 @@ CCTEReq::PcterAllOptional(CMemoryPool *mp)
 //		CCTEReq::Pdpplan
 //
 //	@doc:
-//		Lookup plan properties for given cte id
+//		Lookup plan properties for given cte id and parallel flag
 //
 //---------------------------------------------------------------------------
 CDrvdPropPlan *
-CCTEReq::Pdpplan(ULONG ulCteId) const
+CCTEReq::Pdpplan(ULONG ulCteId, BOOL fParallel) const
 {
-	const CCTEReqEntry *pcre = PcreLookup(ulCteId);
+	const CCTEReqEntry *pcre = PcreLookup(ulCteId, fParallel);
 	if (nullptr != pcre)
 	{
 		return pcre->PdpplanProducer();

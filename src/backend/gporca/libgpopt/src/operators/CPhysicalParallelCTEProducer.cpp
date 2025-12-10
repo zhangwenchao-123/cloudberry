@@ -296,7 +296,7 @@ CPhysicalParallelCTEProducer::PcmDerive(CMemoryPool *mp,
 
 	CCTEMap *pcmProducer = GPOS_NEW(mp) CCTEMap(mp);
 	// store plan properties of the child in producer's CTE map
-	pcmProducer->Insert(m_id, CCTEMap::EctProducer, exprhdl.Pdpplan(0));
+	pcmProducer->Insert(m_id, true, CCTEMap::EctProducer, exprhdl.Pdpplan(0));
 
 	CCTEMap *pcmCombined = CCTEMap::PcmCombine(mp, *pcmProducer, *pcmChild);
 	pcmProducer->Release();

@@ -53,11 +53,12 @@ CCTEMap::~CCTEMap()
 //		CCTEMap::Insert
 //
 //	@doc:
-//		Insert a new map entry. No entry with the same id can already exist
+//		Insert a new map entry. No entry with the same id and parallel flag can already exist
 //
 //---------------------------------------------------------------------------
 void
-CCTEMap::Insert(ULONG ulCteId, ECteType ect, CDrvdPropPlan *pdpplan)
+CCTEMap::Insert(ULONG ulCteId, BOOL fParallel, ECteType ect,
+				CDrvdPropPlan *pdpplan)
 {
 	GPOS_ASSERT(EctSentinel > ect);
 
@@ -66,9 +67,10 @@ CCTEMap::Insert(ULONG ulCteId, ECteType ect, CDrvdPropPlan *pdpplan)
 		pdpplan->AddRef();
 	}
 
-	CCTEMapEntry *pcme = GPOS_NEW(m_mp) CCTEMapEntry(ulCteId, ect, pdpplan);
-	BOOL fSuccess GPOS_ASSERTS_ONLY =
-		m_phmcm->Insert(GPOS_NEW(m_mp) ULONG(ulCteId), pcme);
+	CCTEMapEntry *pcme =
+		GPOS_NEW(m_mp) CCTEMapEntry(ulCteId, fParallel, ect, pdpplan);
+	UlongBoolPair *pPair = GPOS_NEW(m_mp) UlongBoolPair(ulCteId, fParallel);
+	BOOL fSuccess GPOS_ASSERTS_ONLY = m_phmcm->Insert(pPair, pcme);
 	GPOS_ASSERT(fSuccess);
 }
 
@@ -144,23 +146,24 @@ CCTEMap::AddUnresolved(const CCTEMap &cmFirst, const CCTEMap &cmSecond,
 	{
 		const CCTEMapEntry *pcme = hmcmi.Value();
 		ULONG id = pcme->Id();
+		BOOL fParallel = pcme->FParallel();
 		ECteType ectFirst = pcme->Ect();
 		CDrvdPropPlan *pdpplanFirst = pcme->Pdpplan();
 
-		if (nullptr != pcmResult->PcmeLookup(id))
+		if (nullptr != pcmResult->PcmeLookup(id, fParallel))
 		{
 			// skip entries already in the result map
 			continue;
 		}
 
 		// check if entry exists in second map
-		CCTEMapEntry *pcmeSecond = cmSecond.PcmeLookup(id);
+		CCTEMapEntry *pcmeSecond = cmSecond.PcmeLookup(id, fParallel);
 
 		// if entry does not exist in second map, or exists with the same cte type
 		// then it should be in the result
 		if (nullptr == pcmeSecond || ectFirst == pcmeSecond->Ect())
 		{
-			pcmResult->Insert(id, ectFirst, pdpplanFirst);
+			pcmResult->Insert(id, fParallel, ectFirst, pdpplanFirst);
 		}
 	}
 }
@@ -170,13 +173,14 @@ CCTEMap::AddUnresolved(const CCTEMap &cmFirst, const CCTEMap &cmSecond,
 //		CCTEMap::PcmeLookup
 //
 //	@doc:
-//		Lookup info for given cte id
+//		Lookup info for given cte id and parallel flag
 //
 //---------------------------------------------------------------------------
 CCTEMap::CCTEMapEntry *
-CCTEMap::PcmeLookup(ULONG ulCteId) const
+CCTEMap::PcmeLookup(ULONG ulCteId, BOOL fParallel) const
 {
-	return m_phmcm->Find(&ulCteId);
+	UlongBoolPair pair(ulCteId, fParallel);
+	return m_phmcm->Find(&pair);
 }
 
 //---------------------------------------------------------------------------
@@ -201,7 +205,8 @@ CCTEMap::FSubset(const CCTEMap *pcm) const
 	while (hmcmi.Advance())
 	{
 		const CCTEMapEntry *pcme = hmcmi.Value();
-		CCTEMapEntry *pcmeOther = pcm->PcmeLookup(pcme->Id());
+		CCTEMapEntry *pcmeOther =
+			pcm->PcmeLookup(pcme->Id(), pcme->FParallel());
 		if (nullptr == pcmeOther || pcmeOther->Ect() != pcme->Ect())
 		{
 			return false;
@@ -250,7 +255,11 @@ CCTEMap::HashValue() const
 CCTEMap::ECteType
 CCTEMap::Ect(const ULONG id) const
 {
-	CCTEMapEntry *pcme = PcmeLookup(id);
+	CCTEMapEntry *pcme = PcmeLookup(id, false);
+	if (nullptr == pcme)
+	{
+		pcme = PcmeLookup(id, false);
+	}
 	if (nullptr == pcme)
 	{
 		return EctSentinel;
@@ -295,14 +304,16 @@ CCTEMap::FSatisfies(const CCTEReq *pcter) const
 {
 	GPOS_ASSERT(nullptr != pcter);
 	// every CTE marked as "Required" must be in the current map
-	ULongPtrArray *pdrgpul = pcter->PdrgpulRequired();
+	UlongBoolPairArray *pdrgpul = pcter->PdrgpulRequired();
 	const ULONG ulReqd = pdrgpul->Size();
 	for (ULONG ul = 0; ul < ulReqd; ul++)
 	{
-		ULONG *pulId = (*pdrgpul)[ul];
-		ECteType ect = pcter->Ect(*pulId);
+		UlongBoolPair *pPair = (*pdrgpul)[ul];
+		ULONG ulId = pPair->first;
+		BOOL fParallel = pPair->second;
+		ECteType ect = pcter->Ect(ulId);
 
-		CCTEMapEntry *pcme = this->PcmeLookup(*pulId);
+		CCTEMapEntry *pcme = this->PcmeLookup(ulId, fParallel);
 		if (nullptr == pcme || pcme->Ect() != ect)
 		{
 			return false;

@@ -15,6 +15,8 @@
 #ifndef GPOPT_CCTEReq_H
 #define GPOPT_CCTEReq_H
 
+#include <utility>
+
 #include "gpos/base.h"
 #include "gpos/common/CHashMap.h"
 #include "gpos/common/CHashMapIter.h"
@@ -52,6 +54,9 @@ private:
 		// cte id
 		ULONG m_id;
 
+		// parallel flag
+		BOOL m_fParallel;
+
 		// cte type
 		CCTEMap::ECteType m_ect;
 
@@ -65,8 +70,8 @@ private:
 		CCTEReqEntry(const CCTEReqEntry &) = delete;
 
 		// ctor
-		CCTEReqEntry(ULONG id, CCTEMap::ECteType ect, BOOL fRequired,
-					 CDrvdPropPlan *pdpplan);
+		CCTEReqEntry(ULONG id, BOOL fParallel, CCTEMap::ECteType ect,
+					 BOOL fRequired, CDrvdPropPlan *pdpplan);
 
 		// dtor
 		~CCTEReqEntry() override;
@@ -76,6 +81,13 @@ private:
 		Id() const
 		{
 			return m_id;
+		}
+
+		// parallel flag
+		BOOL
+		FParallel() const
+		{
+			return m_fParallel;
 		}
 
 		// cte type
@@ -110,16 +122,17 @@ private:
 
 	};	// class CCTEReqEntry
 
-	// map CTE id to CTE Req entry
+	// map CTE id and parallel flag pair to CTE Req entry
 	using UlongToCTEReqEntryMap =
-		CHashMap<ULONG, CCTEReqEntry, gpos::HashValue<ULONG>,
-				 gpos::Equals<ULONG>, CleanupDelete<ULONG>,
+		CHashMap<UlongBoolPair, CCTEReqEntry, gpos::HashValue<UlongBoolPair>,
+				 gpos::Equals<UlongBoolPair>, CleanupDelete<UlongBoolPair>,
 				 CleanupRelease<CCTEReqEntry>>;
 
 	// map iterator
 	using UlongToCTEReqEntryMapIter =
-		CHashMapIter<ULONG, CCTEReqEntry, gpos::HashValue<ULONG>,
-					 gpos::Equals<ULONG>, CleanupDelete<ULONG>,
+		CHashMapIter<UlongBoolPair, CCTEReqEntry,
+					 gpos::HashValue<UlongBoolPair>,
+					 gpos::Equals<UlongBoolPair>, CleanupDelete<UlongBoolPair>,
 					 CleanupRelease<CCTEReqEntry>>;
 
 	// memory pool
@@ -128,11 +141,11 @@ private:
 	// cte map
 	UlongToCTEReqEntryMap *m_phmcter;
 
-	// required cte ids (not optional)
-	ULongPtrArray *m_pdrgpulRequired;
+	// required cte (id, parallel) pairs (not optional)
+	UlongBoolPairArray *m_pdrgpulRequired;
 
-	// lookup info for given cte id
-	CCTEReqEntry *PcreLookup(ULONG ulCteId) const;
+	// lookup info for given cte id and parallel flag
+	CCTEReqEntry *PcreLookup(ULONG ulCteId, BOOL fParallel) const;
 
 public:
 	CCTEReq(const CCTEReq &) = delete;
@@ -143,8 +156,8 @@ public:
 	// dtor
 	~CCTEReq() override;
 
-	// required cte ids
-	ULongPtrArray *
+	// required cte (id, parallel) pairs
+	UlongBoolPairArray *
 	PdrgpulRequired() const
 	{
 		return m_pdrgpulRequired;
@@ -153,9 +166,9 @@ public:
 	// return the CTE type associated with the given ID in the requirements
 	CCTEMap::ECteType Ect(const ULONG id) const;
 
-	// insert a new entry, no entry with the same id can already exist
-	void Insert(ULONG ulCteId, CCTEMap::ECteType ect, BOOL fRequired,
-				CDrvdPropPlan *pdpplan);
+	// insert a new entry, no entry with the same id and parallel flag can already exist
+	void Insert(ULONG ulCteId, BOOL fParallel, CCTEMap::ECteType ect,
+				BOOL fRequired, CDrvdPropPlan *pdpplan);
 
 	// insert a new consumer entry with the given id. The plan properties are
 	// taken from the given context
@@ -191,8 +204,8 @@ public:
 	// create a copy of the current requirement where all the entries are marked optional
 	CCTEReq *PcterAllOptional(CMemoryPool *mp);
 
-	// lookup plan properties for given cte id
-	CDrvdPropPlan *Pdpplan(ULONG ulCteId) const;
+	// lookup plan properties for given cte id and parallel flag
+	CDrvdPropPlan *Pdpplan(ULONG ulCteId, BOOL fParallel) const;
 
 	// print function
 	IOstream &OsPrint(IOstream &os) const;

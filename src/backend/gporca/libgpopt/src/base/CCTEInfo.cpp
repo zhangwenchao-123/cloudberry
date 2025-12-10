@@ -579,7 +579,9 @@ CCTEInfo::PcterProducers(CMemoryPool *mp) const
 	while (hmulei.Advance())
 	{
 		const CCTEInfoEntry *pcteinfoentry = hmulei.Value();
-		pcter->Insert(pcteinfoentry->UlCTEId(), CCTEMap::EctProducer,
+		pcter->Insert(pcteinfoentry->UlCTEId(), false, CCTEMap::EctProducer,
+					  false /*fRequired*/, nullptr /*pdpplan*/);
+		pcter->Insert(pcteinfoentry->UlCTEId(), true, CCTEMap::EctProducer,
 					  false /*fRequired*/, nullptr /*pdpplan*/);
 	}
 

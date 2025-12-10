@@ -680,7 +680,7 @@ CExpressionHandle::DerivePlanPropsForCostContext()
 		// copy producer plan properties to passed derived plan properties context
 		ULONG ulCTEId = CPhysicalCTEConsumer::PopConvert(pop)->UlCTEId();
 		CDrvdPropPlan *pdpplan =
-			m_pcc->Poc()->Prpp()->Pcter()->Pdpplan(ulCTEId);
+			m_pcc->Poc()->Prpp()->Pcter()->Pdpplan(ulCTEId, false /*fParallel*/);
 		if (nullptr != pdpplan)
 		{
 			pdpctxtplan->CopyCTEProducerProps(pdpplan, ulCTEId);
@@ -691,7 +691,7 @@ CExpressionHandle::DerivePlanPropsForCostContext()
 		// copy producer plan properties to passed derived plan properties context
 		ULONG ulCTEId = CPhysicalParallelCTEConsumer::PopConvert(pop)->UlCTEId();
 		CDrvdPropPlan *pdpplan =
-			m_pcc->Poc()->Prpp()->Pcter()->Pdpplan(ulCTEId);
+			m_pcc->Poc()->Prpp()->Pcter()->Pdpplan(ulCTEId, true /*fParallel*/);
 		if (nullptr != pdpplan)
 		{
 			pdpctxtplan->CopyCTEProducerProps(pdpplan, ulCTEId);

@@ -15,6 +15,8 @@
 #include "gpos/common/CHashMap.h"
 #include "gpos/common/CStack.h"
 
+#include <utility>
+
 #include "gpopt/base/CColRef.h"
 #include "gpopt/base/CColRefSet.h"
 #include "gpopt/base/CColumnFactory.h"
@@ -24,6 +26,13 @@ namespace gpopt
 {
 // fwd declarations
 class CLogicalCTEConsumer;
+
+// Type definitions for CTE tracking with parallel support
+// UlongBoolPair: composite key (CTE ID, parallel flag)
+using UlongBoolPair = std::pair<ULONG, BOOL>;
+
+// Array type for storing pairs of (CTE ID, parallel flag)
+using UlongBoolPairArray = CDynamicPtrArray<UlongBoolPair, CleanupDelete>;
 
 //---------------------------------------------------------------------------
 //	@class:
